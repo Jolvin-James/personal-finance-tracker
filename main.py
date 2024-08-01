@@ -2,6 +2,7 @@ import pandas as pd #allow us to load in the csv file
 import csv
 from datetime import datetime
 from data_entry import get_date, get_amount, get_category, get_description
+import matplotlib.pyplot as plt
 
 class CSV:  #a class is created so to work easily with the csv file
     #to initialize a csv file:
@@ -41,9 +42,18 @@ class CSV:  #a class is created so to work easily with the csv file
     #give us all of the transactions within a date range.
     @classmethod
     def get_transactions(cls, start_date, end_date):
-        df = pd.read_csv(cls.CSV_FILE)
+        df = pd.read_csv(cls.CSV_FILE, skipinitialspace=True)
         #we're going to convert all of the dates inside of the date column to a date time object, 
         #so that we can actually use them to kind of filter by different transactions
+        # Check if the DataFrame is empty
+        if df.empty:
+            print("The CSV file is empty or does not contain valid data.")
+            return pd.DataFrame()  # Return an empty DataFrame
+
+        # Print the DataFrame for debugging
+        print(df.head())
+        print(df.columns)
+        
         df["date"] = pd.to_datetime(df["date"], format=CSV.FORMAT)
         #here we are taking the dates as string and parsing them as date object -> strptime
         start_date = datetime.strptime(start_date, CSV.FORMAT)
@@ -83,6 +93,65 @@ def add():
     description = get_description()
     CSV.add_entry(date, amount, category, description)
 
-#CSV.initialize_csv()
-CSV.get_transactions("19-07-2024", "21-07-2024")
-#add()
+
+def plot_transactions(df):
+    df.set_index("date", inplace=True)
+    #the index is the way in which we locate and manipulate different rows. 
+    #So we're using the date column because that's how we want to kind of find different information.
+
+    income_df = (df[df["category"] == "Income"].resample("D").sum().reindex(df.index, fill_value = 0))
+    #create two separate data frames the income data frame and the expense data frame. The reason for that is 
+    #that I want to have income as one line and expenses as another line.
+    #D stands for daily frequency
+    #we're going to take our filtered data frame with all of the transactions that we want. 
+    #We're going to look at them. And we're going to make sure that we now have a row for every single day. That's what resampling is doing
+    #Think of resampling as just kind of filling in all of the missing days
+    #next we are summing all the amounts
+    #when we reindex, we just make sure that the data frame is going to conform to this index. And we fill in any missing values with zero
+    expense_df = (df[df["category"] == "Expense"].resample("D").sum().reindex(df.index, fill_value = 0))
+
+    plt.figure(figsize=(10, 5))
+    #figure is kind of setting up the screen or the canvas where we're going to actually be putting the graph.
+    plt.plot(income_df.index, income_df["amount"], label="Income", color="g")
+    plt.plot(expense_df.index, expense_df["amount"], label="Expense", color="r")
+    #The index means we're plotting the data pretty much
+    #income_df.index -> this as the x axis value which is the date and 
+    #income_df["amount"] -> the amount as the y axis value
+    plt.xlabel("Date")
+    plt.ylabel("Amount")
+    plt.title("Income and Expenses Over Time")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
+
+def main():
+    while True:
+        print("\n1. Add new transaction")
+        print("2. View transactions and summary within a date range")
+        print("3. Exit")
+        choice = input("Enter your choice (1-3): ")
+
+        if choice == "1":
+            add()
+        elif choice == "2":
+            start_date = get_date("Enter the start date (dd-mm-yyyy): ")
+            end_date = get_date("Enter the end date (dd-mm-yyyy): ")
+            df = CSV.get_transactions(start_date, end_date)
+            #we create the df variable so as to present it on graphs
+            if input("Do you wanna see a plot (y/n)?: ").lower() == "y":
+                plot_transactions(df)
+        elif choice == "3":
+            print("Exiting...")
+            break
+        else:
+            print("Invalid choice. Enter 1, 2 or 3.")
+
+
+if __name__ == "__main__":
+    main()
+
+#CSV.initialize_csv() -- in first commit
+#CSV.get_transactions("19-07-2024", "21-07-2024")  -- in third commit
+#add()  -- in second commit
